@@ -1,0 +1,28 @@
+# Certificates and keys
+certs/
+*.crt
+*.key
+*.pem
+
+# Zig build artifacts
+zig-cache/
+zig-out/
+build/
+lib/
+out/
+build-*/
+*.o
+
+# Executable
+sec_server
+
+# Editor and OS specific files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
+
+# Logs
+*.log 
