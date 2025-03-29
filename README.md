@@ -7,8 +7,8 @@ A secure HTTP/HTTPS server implemented in Zig, featuring modern security best pr
 - 🔒 **TLS Support** - HTTPS with TLS 1.3 support (configurable)
 - 🛡️ **Input Validation** - Strong parameter validation to prevent common attacks
 - 🧩 **Rate Limiting** - Protection against brute-force and DDoS attacks
-- 📝 **Security Headers** - Comprehensive set of modern security headers
-- ⏱️ **Connection Timeouts** - Protection against slow-loris and resource exhaustion attacks
+- 📝 **Zecurity Headers** - Comprehensive set of modern security headers
+- ⏱️ **Connection Timeouts** - Protection against Zlow-loris and resource exhaustion attacks
 - 🔑 **CSRF Protection** - HMAC-SHA256 based CSRF tokens with proper validation
 - 🔍 **Request Logging and Tracing** - Detailed logging with unique request IDs
 
@@ -44,14 +44,14 @@ A secure HTTP/HTTPS server implemented in Zig, featuring modern security best pr
    zig build
    ```
 
-4. Run the server:
+4. Run the zerver:
    ```bash
    zig-out/bin/sec_server
    ```
 
 5. Open your browser and navigate to:
-   - HTTP: `http://127.0.0.1:9090`
-   - HTTPS (if TLS enabled): `https://127.0.0.1:9090` (you'll need to accept the self-signed certificate warning)
+   - HTTP: `http://127.0.0.1:7777`
+   - HTTPS (if TLS enabled): `https://127.0.0.1:7777` (you'll need to accept the self-signed certificate warning)
 
 ### Configuration
 
@@ -59,7 +59,7 @@ The server can be configured by modifying the constants at the top of `src/main.
 
 ```zig
 const server_addr = "127.0.0.1";         // Server binding address
-const server_port = 9090;                // Server port
+const server_port = 7777;                // Server port
 const max_header_size = 8192;            // 8KB max header size
 const max_body_size = 1024 * 1024;       // 1MB max body size
 const connection_timeout_ns = 30 * time.ns_per_s; // 30 seconds timeout
