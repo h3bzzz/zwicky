@@ -29,7 +29,7 @@ A secure HTTP/HTTPS server implemented in Zig, featuring modern security best pr
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/sec_server.git
+   git clone https://github.com/h3bzzz/zwicky.git
    cd sec_server
    ```
 
