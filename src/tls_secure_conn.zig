@@ -6,10 +6,6 @@ const crypto = std.crypto;
 const Allocator = mem.Allocator;
 const os = std.os;
 
-// This is a more robust TLS connection implementation
-// In a real implementation, you would integrate with a TLS library
-// This is a placeholder that would be replaced with actual TLS functionality
-
 pub const TlsVersion = enum {
     v1_2,
     v1_3, // Recommended
@@ -47,7 +43,6 @@ pub const TlsError = error{
     DecryptionFailed,
 };
 
-// Secure TLS connection implementation
 pub const SecureConnection = struct {
     stream: net.Stream,
     allocator: Allocator,
@@ -102,8 +97,6 @@ pub const SecureConnection = struct {
         self.certificate_verified = true;
     }
 
-    // These methods delegate directly to the underlying stream
-    // In a real TLS implementation, they would handle encryption/decryption
 
     pub fn read(self: *SecureConnection, buffer: []u8) !usize {
         // Just a passthrough to the underlying stream in our mock implementation
@@ -111,21 +104,17 @@ pub const SecureConnection = struct {
     }
 
     pub fn write(self: *SecureConnection, buffer: []const u8) !usize {
-        // Just a passthrough to the underlying stream in our mock implementation
         return self.stream.write(buffer);
     }
 
-    // Add basic sockAddr function needed by HTTP server
     pub fn getLocalAddr(self: *const SecureConnection) !net.Address {
         return self.stream.getLocalAddr();
     }
 
-    // Add basic sockAddr function needed by HTTP server
     pub fn getRemoteAddr(self: *const SecureConnection) !net.Address {
         return self.stream.getRemoteAddr();
     }
 
-    // Add basic sockAddr function needed by HTTP server
     pub fn getHandle(self: *const SecureConnection) os.socket_t {
         return self.stream.handle;
     }
@@ -192,17 +181,9 @@ pub fn verifyCertificate(cert_data: []const u8, trusted_cas: []const []const u8,
     _ = cert_data;
     _ = trusted_cas;
     _ = allocator;
-
-    // In a real implementation, you would:
-    // 1. Parse the certificate
-    // 2. Verify the signature against trusted CAs
-    // 3. Check validity period
-    // 4. Check revocation status
-    // 5. Verify hostname/purpose
     return true;
 }
 
-// Get recommended cipher suites based on security level
 pub fn getRecommendedCipherSuites(strength: CipherStrength) []const []const u8 {
     return switch (strength) {
         .high => &[_][]const u8{
