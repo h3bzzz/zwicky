@@ -16,12 +16,11 @@ const security = @import("security.zig");
 const tls_utils = @import("tls_utils.zig");
 const tls_secure = @import("tls_secure_conn.zig");
 
-// Configuration constants
 const server_addr = "127.0.0.1";
 const server_port = 7777;
-const max_header_size = 8192; // 8KB max header size
-const max_body_size = 1024 * 1024; // 1MB max body size
-const connection_timeout_ns = 30 * time.ns_per_s; // 30 seconds timeout
+const max_header_size = 8192;
+const max_body_size = 1024 * 1024;
+const connection_timeout_ns = 30 * time.ns_per_s;
 const enable_tls = false; // Disabled for development testing (set to true for production)
 
 // TLS configuration
@@ -30,11 +29,11 @@ const tls_config = tls_secure.TlsSecureConfig{
     .key_file = "certs/server.key",
     .ca_file = null, // Set to CA file path for client verification
     .verify_client = false,
-    .min_version = .v1_3, // Only support TLS 1.3 (most secure)
-    .cipher_strength = .high, // Only strongest ciphers
+    .min_version = .v1_3,
+    .cipher_strength = .high,
     .use_ocsp_stapling = true,
     .use_sni = true,
-    .session_tickets_enabled = false, // More secure when disabled
+    .session_tickets_enabled = false,
     .use_perfect_forward_secrecy = true,
 };
 
@@ -234,7 +233,7 @@ fn startServer(server: *net.Server, allocator: mem.Allocator, csrf: *security.Cs
                     continue;
                 };
             }
-        } // End of connection scope
+        }
     }
 }
 
@@ -285,18 +284,15 @@ fn handleRequest(request: *http.Server.Request, allocator: mem.Allocator, client
         return ServerError.UnsupportedMethod;
     }
 
-    // Basic input validation of request target
     if (request.head.target.len == 0 or request.head.target.len > 1024) {
         return ServerError.InvalidRequest;
     }
 
-    // Check for dangerous paths (path traversal) using security module
     if (!security.validateRequestParams(request.head.target)) {
         log.warn("Potential malicious request from {s}: {s}", .{ client_addr, request.head.target });
         return ServerError.InvalidRequest;
     }
 
-    // Route the request
     if (mem.eql(u8, request.head.target, "/") or mem.eql(u8, request.head.target, "/index.html")) {
         try handleHome(request, csrf, allocator, secure_headers);
     } else if (mem.startsWith(u8, request.head.target, "/api/")) {
