@@ -11,7 +11,6 @@ const heap = std.heap;
 const log = std.log;
 const time = std.time;
 
-// Import our security and TLS modules
 const security = @import("security.zig");
 const tls_utils = @import("tls_utils.zig");
 const tls_secure = @import("tls_secure_conn.zig");
@@ -23,7 +22,6 @@ const max_body_size = 1024 * 1024;
 const connection_timeout_ns = 30 * time.ns_per_s;
 const enable_tls = false; // Disabled for development testing (set to true for production)
 
-// TLS configuration
 const tls_config = tls_secure.TlsSecureConfig{
     .cert_file = "certs/server.crt",
     .key_file = "certs/server.key",
@@ -37,7 +35,6 @@ const tls_config = tls_secure.TlsSecureConfig{
     .use_perfect_forward_secrecy = true,
 };
 
-// Error types
 const ServerError = error{
     InvalidRequest,
     RequestTooLarge,
@@ -47,13 +44,11 @@ const ServerError = error{
     TlsError,
 };
 
-// Rate limit entry type
 const RateLimitEntry = struct {
     count: u32,
     timestamp: i64,
 };
 
-// Request body structure
 const Body = struct {
     csrf_token: []const u8,
     message: ?[]const u8 = null,
@@ -69,20 +64,16 @@ fn startServer(server: *net.Server, allocator: mem.Allocator, csrf: *security.Cs
     var rate_limiter = std.StringHashMap(RateLimitEntry).init(allocator);
     defer rate_limiter.deinit();
 
-    // Periodically clean up expired CSRF tokens
     const cleanup_interval_ms = 5 * 60 * 1000; // 5 minutes
     var last_cleanup = time.milliTimestamp();
 
-    // Request processing loop
     while (true) {
         var connection = server.accept() catch |err| {
             log.err("Connection to Zwicky interrupted: {}", .{err});
             continue;
         };
 
-        // Use a separate scope to ensure connection is closed properly
         {
-            // Flag to track if we need to close the connection
             var should_close_connection = true;
             defer {
                 if (should_close_connection) {
@@ -90,7 +81,6 @@ fn startServer(server: *net.Server, allocator: mem.Allocator, csrf: *security.Cs
                 }
             }
 
-            // Get client address for logging and rate limiting
             const client_addr = connection.address;
             const addr_str = std.fmt.allocPrint(allocator, "{}", .{client_addr}) catch |err| {
                 log.err("Failed to format client address: {}", .{err});
@@ -98,16 +88,13 @@ fn startServer(server: *net.Server, allocator: mem.Allocator, csrf: *security.Cs
             };
             defer allocator.free(addr_str);
 
-            // Check rate limit
             if (checkRateLimit(&rate_limiter, addr_str)) {
                 log.warn("Rate limit exceeded for IP: {s}", .{addr_str});
                 continue;
             }
 
-            // Get security headers once for all requests
             const secure_headers = security.getSecureHeaders();
 
-            // Apply TLS if enabled
             if (enable_tls) {
                 var secure_conn = tls_secure.createSecureServer(tls_config, connection.stream, allocator) catch |err| {
                     log.err("TLS handshake failed: {}", .{err});
@@ -115,24 +102,20 @@ fn startServer(server: *net.Server, allocator: mem.Allocator, csrf: *security.Cs
                 };
                 defer secure_conn.deinit();
 
-                // Since the secure connection now owns the stream, we don't need to close it
                 should_close_connection = false;
 
-                // Get and log TLS security info
                 const security_info = secure_conn.getSecurityInfo();
                 log.info("TLS connection established: version={s}, cipher={s}", .{
                     @tagName(security_info.version),
                     security_info.cipher,
                 });
 
-                // For TLS connections, read data directly from the secure connection
                 const read_buffer = allocator.alloc(u8, max_header_size) catch |err| {
                     log.err("Failed to allocate read buffer: {}", .{err});
                     continue;
                 };
                 defer allocator.free(read_buffer);
 
-                // Create HTTP server with the secure connection as the transport
                 var http_server = http.Server.init(connection, read_buffer);
 
                 var request = http_server.receiveHead() catch |err| {
@@ -140,14 +123,12 @@ fn startServer(server: *net.Server, allocator: mem.Allocator, csrf: *security.Cs
                     continue;
                 };
 
-                // Clean up expired CSRF tokens periodically
                 const now = time.milliTimestamp();
                 if (now - last_cleanup > cleanup_interval_ms) {
                     csrf.cleanupExpiredTokens();
                     last_cleanup = now;
                 }
 
-                // Process the request
                 handleRequest(&request, allocator, addr_str, csrf, secure_headers) catch |err| {
                     log.err("Failed to handle TLS request: {s}", .{@errorName(err)});
 
@@ -180,7 +161,6 @@ fn startServer(server: *net.Server, allocator: mem.Allocator, csrf: *security.Cs
                     continue;
                 };
             } else {
-                // Non-TLS connection handling
                 const read_buffer = allocator.alloc(u8, max_header_size) catch |err| {
                     log.err("Failed to allocate read buffer: {}", .{err});
                     continue;
@@ -194,7 +174,6 @@ fn startServer(server: *net.Server, allocator: mem.Allocator, csrf: *security.Cs
                     continue;
                 };
 
-                // Clean up expired CSRF tokens periodically
                 const now = time.milliTimestamp();
                 if (now - last_cleanup > cleanup_interval_ms) {
                     csrf.cleanupExpiredTokens();
@@ -242,7 +221,6 @@ fn checkRateLimit(rate_limiter: *std.StringHashMap(RateLimitEntry), client_addr:
     const window_ms = 60 * 1000; // 1 minute window
     const max_requests = 100; // Maximum 100 requests per minute
 
-    // Check if we already have an entry for this IP
     if (rate_limiter.get(client_addr)) |entry| {
         // Check if window has passed
         if (now - entry.timestamp > window_ms) {
@@ -251,17 +229,13 @@ fn checkRateLimit(rate_limiter: *std.StringHashMap(RateLimitEntry), client_addr:
             return false;
         }
 
-        // Window is still active, update entry with incremented count
         const new_count = entry.count + 1;
         rate_limiter.put(client_addr, .{ .count = new_count, .timestamp = entry.timestamp }) catch return true;
 
-        // Check if over limit
         return new_count > max_requests;
     } else {
-        // Make a durable copy of the client_addr to use as hash map key
         const key_copy = rate_limiter.allocator.dupe(u8, client_addr) catch return true;
 
-        // Store new entry with the durable key
         rate_limiter.put(key_copy, .{ .count = 1, .timestamp = now }) catch {
             // Free the key if we failed to insert
             rate_limiter.allocator.free(key_copy);
@@ -273,10 +247,8 @@ fn checkRateLimit(rate_limiter: *std.StringHashMap(RateLimitEntry), client_addr:
 }
 
 fn handleRequest(request: *http.Server.Request, allocator: mem.Allocator, client_addr: []const u8, csrf: *security.CsrfProtection, secure_headers: [7]http.Header) !void {
-    // Log the request
     log.info("Request from {s}: {s} {s}", .{ client_addr, @tagName(request.head.method), request.head.target });
 
-    // Validate request method
     if (request.head.method != .GET and
         request.head.method != .POST and
         request.head.method != .HEAD)
@@ -303,7 +275,6 @@ fn handleRequest(request: *http.Server.Request, allocator: mem.Allocator, client
             .status = .ok,
         });
     } else {
-        // 404 Not Found for any other routes
         var headers_buffer: [8]http.Header = undefined;
         var headers_count = secure_headers.len;
         @memcpy(headers_buffer[0..headers_count], secure_headers[0..]);
@@ -318,7 +289,6 @@ fn handleRequest(request: *http.Server.Request, allocator: mem.Allocator, client
 }
 
 fn handleHome(request: *http.Server.Request, csrf: *security.CsrfProtection, allocator: mem.Allocator, secure_headers: [7]http.Header) !void {
-    // Generate CSRF token for the form
     const csrf_token = try csrf.generateToken();
     defer allocator.free(csrf_token);
 
@@ -364,7 +334,6 @@ fn handleHome(request: *http.Server.Request, csrf: *security.CsrfProtection, all
 }
 
 fn handleApi(request: *http.Server.Request, allocator: mem.Allocator, csrf: *security.CsrfProtection, secure_headers: [7]http.Header) !void {
-    // create CSRF Token
     const csrf_token = try csrf.generateToken();
     defer allocator.free(csrf_token);
 
@@ -374,7 +343,6 @@ fn handleApi(request: *http.Server.Request, allocator: mem.Allocator, csrf: *sec
     headers_buffer[headers_count] = .{ .name = "Content-Type", .value = "application/json" };
     headers_count += 1;
 
-    // If this is a POST request, validate the CSRF token
     if (request.head.method == .POST) {
         const is_valid_csrf = csrf.validateToken(csrf_token);
 
@@ -393,7 +361,6 @@ fn handleApi(request: *http.Server.Request, allocator: mem.Allocator, csrf: *sec
         }
     }
 
-    // Generate a random request ID for traceability
     var request_id_buf: [16]u8 = undefined;
     crypto.random.bytes(&request_id_buf);
     var request_id: [32]u8 = undefined;
