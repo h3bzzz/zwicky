@@ -6,20 +6,14 @@ const heap = std.heap;
 const log = std.log;
 const time = std.time;
 
-// This is a simple tool to generate self-signed certificates for testing purposes
-// In a production environment, you should use certificates from a trusted CA
-
 pub fn main() !void {
     log.info("Generating self-signed certificates for TLS testing...", .{});
 
-    // Set up allocator
     var gpa = heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
-    // Create certificates directory if it doesn't exist
     try fs.cwd().makePath("certs");
 
-    // Generate certificates using external OpenSSL
     const results = try generateWithOpenSSL();
 
     if (results) {
@@ -30,7 +24,6 @@ pub fn main() !void {
     }
 }
 
-// Define the key type to use
 const KeyType = enum {
     rsa,
     ec,
@@ -39,7 +32,6 @@ const KeyType = enum {
 fn generateWithOpenSSL() !bool {
     const key_type = KeyType.rsa; // Change to .ec for elliptic curve
 
-    // Check for O
     const openssl_check = std.ChildProcess.exec(.{
         .allocator = heap.page_allocator,
         .argv = &[_][]const u8{ "openssl", "version" },
@@ -63,7 +55,6 @@ fn generateWithOpenSSL() !bool {
     log.info("Generating private key ({s})...", .{@tagName(key_type)});
 
     const key_result = if (key_type == .rsa) blk: {
-        // Generate RSA key
         break :blk std.ChildProcess.exec(.{
             .allocator = heap.page_allocator,
             .argv = &[_][]const u8{
@@ -76,7 +67,6 @@ fn generateWithOpenSSL() !bool {
             return false;
         };
     } else blk: {
-        // Generate EC key (using P-384 curve for strong security)
         break :blk std.ChildProcess.exec(.{
             .allocator = heap.page_allocator,
             .argv = &[_][]const u8{ "openssl", "ecparam", "-name", "secp384r1", "-genkey", "-noout", "-out", "certs/server.key" },
